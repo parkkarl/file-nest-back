@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.ts';
 import { files, shares, versions } from '../db/schema.ts';
 import { gone, notFound, unauthorized } from '../lib/errors.ts';
@@ -78,10 +78,23 @@ app.get('/:token/content', async (c) => {
   if (pwd !== 'ok') return unauthorized(c, 'password required or incorrect');
 
   const { share, version, file } = resolved.value;
-  await db
+
+  // Guarded atomic increment — a single UPDATE … WHERE ensures that two
+  // concurrent downloads cannot both pass a maxDownloads or expiry check.
+  const nowIso = new Date().toISOString();
+  const res = db
     .update(shares)
-    .set({ downloadCount: share.downloadCount + 1 })
-    .where(eq(shares.id, share.id));
+    .set({ downloadCount: sql`${shares.downloadCount} + 1` })
+    .where(
+      sql`${shares.id} = ${share.id}
+        AND ${shares.revokedAt} IS NULL
+        AND (${shares.maxDownloads} IS NULL OR ${shares.downloadCount} < ${shares.maxDownloads})
+        AND (${shares.expiresAt} IS NULL OR ${shares.expiresAt} > ${nowIso})`,
+    )
+    .run();
+  if ((res as unknown as { changes: number }).changes === 0) {
+    return gone(c, 'download limit reached or link expired');
+  }
 
   return new Response(readBlob(version.storagePath), {
     headers: {

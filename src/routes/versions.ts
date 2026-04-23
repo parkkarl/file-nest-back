@@ -53,27 +53,37 @@ app.post('/:fileId/versions', async (c) => {
   const mimeType = content.type || 'application/octet-stream';
   const blob = await storeBlob(await content.arrayBuffer());
 
-  const maxRow = await db.select({ m: max(versions.versionNumber) }).from(versions).where(eq(versions.fileId, f.id)).get();
-  const nextNumber = (maxRow?.m ?? 0) + 1;
-
   const now = new Date().toISOString();
   const versionId = randomUUID();
 
-  db.transaction((tx) => {
-    tx.insert(versions).values({
-      id: versionId,
-      fileId: f.id,
-      versionNumber: nextNumber,
-      note,
-      mimeType,
-      sizeBytes: blob.sizeBytes,
-      checksum: blob.checksum,
-      storagePath: blob.storagePath,
-      createdBy: ownerId,
-      createdAt: now,
-    }).run();
-    tx.update(files).set({ currentVersionId: versionId, updatedAt: now }).where(eq(files.id, f.id)).run();
-  });
+  try {
+    // max-select + insert in the same transaction so concurrent uploads
+    // can't both read the same max and collide on the UNIQUE(fileId, versionNumber)
+    db.transaction((tx) => {
+      const maxRow = tx
+        .select({ m: max(versions.versionNumber) })
+        .from(versions)
+        .where(eq(versions.fileId, f.id))
+        .get();
+      const nextNumber = (maxRow?.m ?? 0) + 1;
+      tx.insert(versions).values({
+        id: versionId,
+        fileId: f.id,
+        versionNumber: nextNumber,
+        note,
+        mimeType,
+        sizeBytes: blob.sizeBytes,
+        checksum: blob.checksum,
+        storagePath: blob.storagePath,
+        createdBy: ownerId,
+        createdAt: now,
+      }).run();
+      tx.update(files).set({ currentVersionId: versionId, updatedAt: now }).where(eq(files.id, f.id)).run();
+    });
+  } catch (err) {
+    await deleteBlob(blob.storagePath);
+    throw err;
+  }
 
   const created = (await db.select().from(versions).where(eq(versions.id, versionId)).get())!;
   c.header('Location', versionUrl(f.id, versionId));

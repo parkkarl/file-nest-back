@@ -7,6 +7,7 @@
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
     "db:migrate": "bun run src/db/migrate.ts",
+    "db:gc": "bun run src/db/gc.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

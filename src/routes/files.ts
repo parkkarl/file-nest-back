@@ -83,32 +83,40 @@ app.post('/', async (c) => {
   const fileId = randomUUID();
   const versionId = randomUUID();
 
-  db.transaction((tx) => {
-    tx.insert(files).values({
-      id: fileId,
-      ownerId,
-      name,
-      description,
-      currentVersionId: versionId,
-      createdAt: now,
-      updatedAt: now,
-    }).run();
-    tx.insert(versions).values({
-      id: versionId,
-      fileId,
-      versionNumber: 1,
-      note: null,
-      mimeType,
-      sizeBytes: blob.sizeBytes,
-      checksum: blob.checksum,
-      storagePath: blob.storagePath,
-      createdBy: ownerId,
-      createdAt: now,
-    }).run();
-  });
+  try {
+    db.transaction((tx) => {
+      tx.insert(files).values({
+        id: fileId,
+        ownerId,
+        name,
+        description,
+        currentVersionId: versionId,
+        createdAt: now,
+        updatedAt: now,
+      }).run();
+      tx.insert(versions).values({
+        id: versionId,
+        fileId,
+        versionNumber: 1,
+        note: null,
+        mimeType,
+        sizeBytes: blob.sizeBytes,
+        checksum: blob.checksum,
+        storagePath: blob.storagePath,
+        createdBy: ownerId,
+        createdAt: now,
+      }).run();
+    });
+  } catch (err) {
+    await deleteBlob(blob.storagePath);
+    throw err;
+  }
 
   const created = await db.select().from(files).where(eq(files.id, fileId)).get();
-  if (!created) return badRequest(c, 'failed to create');
+  if (!created) {
+    await deleteBlob(blob.storagePath);
+    throw new Error('file row disappeared after insert');
+  }
   const dto = toFileDto(created, { mimeType, sizeBytes: blob.sizeBytes, versionCount: 1 });
   c.header('Location', fileUrl(fileId));
   c.header('ETag', computeEtag(created));
