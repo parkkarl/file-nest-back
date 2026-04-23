@@ -9,6 +9,7 @@ import { toVersionDto } from '../lib/dto.ts';
 import { versionUrl } from '../lib/hateoas.ts';
 import { readPagination, setPaginationHeaders } from '../lib/pagination.ts';
 import { deleteBlob, readBlob, storeBlob } from '../lib/storage.ts';
+import { contentDispositionAttachment } from '../lib/http.ts';
 import { config } from '../config.ts';
 
 const app = new Hono<{ Variables: AuthVars }>();
@@ -44,6 +45,10 @@ app.post('/:fileId/versions', async (c) => {
   const f = await ownedFile(ownerId, c.req.param('fileId'));
   if (!f) return notFound(c);
 
+  const declaredLen = Number(c.req.header('Content-Length') ?? 0);
+  if (declaredLen && declaredLen > config.maxUploadBytes) {
+    return payloadTooLarge(c, `max ${config.maxUploadBytes} bytes`);
+  }
   const form = await c.req.parseBody();
   const content = form['content'];
   if (!(content instanceof File)) return badRequest(c, 'content field (file) is required');
@@ -145,7 +150,8 @@ app.get('/:fileId/versions/:versionId/content', async (c) => {
     headers: {
       'Content-Type': v.mimeType,
       'Content-Length': String(v.sizeBytes),
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(f.name)}"`,
+      'Content-Disposition': contentDispositionAttachment(f.name),
+      'X-Content-Type-Options': 'nosniff',
       'ETag': `"${v.checksum}"`,
     },
   });

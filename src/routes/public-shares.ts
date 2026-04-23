@@ -5,6 +5,7 @@ import { files, shares, versions } from '../db/schema.ts';
 import { gone, notFound, unauthorized } from '../lib/errors.ts';
 import { toPublicShareDto } from '../lib/dto.ts';
 import { readBlob } from '../lib/storage.ts';
+import { contentDispositionAttachment } from '../lib/http.ts';
 
 const app = new Hono();
 
@@ -100,7 +101,8 @@ app.get('/:token/content', async (c) => {
     headers: {
       'Content-Type': version.mimeType,
       'Content-Length': String(version.sizeBytes),
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(file.name)}"`,
+      'Content-Disposition': contentDispositionAttachment(file.name),
+      'X-Content-Type-Options': 'nosniff',
       'ETag': `"${version.checksum}"`,
     },
   });
