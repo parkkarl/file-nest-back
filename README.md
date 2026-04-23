@@ -2,6 +2,14 @@
 
 RESTful OpenAPI 3.1 specification for file upload, version management, and shareable public links.
 
+## 🔗 Open in Swagger Editor
+
+[**▶ View the API in Swagger Editor**](https://editor.swagger.io/?url=https://raw.githubusercontent.com/parkkarl/file-nest-back/main/openapi.json)
+
+Alternative viewers:
+- [Redoc](https://redocly.github.io/redoc/?url=https://raw.githubusercontent.com/parkkarl/file-nest-back/main/openapi.json)
+- [Swagger UI (petstore host)](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/parkkarl/file-nest-back/main/openapi.json)
+
 ## Contents
 
 - [`openapi.json`](./openapi.json) — full API specification
