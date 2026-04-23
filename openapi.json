@@ -1,32 +1,32 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Failide jagamise ja versioonihalduse API",
+    "title": "File Nest API",
     "version": "1.0.0",
-    "description": "RESTful API failide üleslaadimiseks, versioonihalduseks ja jagatavate\navalike linkide loomiseks. Ressursid on nimisõnad, operatsioonid toimuvad\nHTTP meetodite kaudu, olekud väljenduvad HTTP staatuskoodides.\n\nRessursihierarhia:\n  /files                                    (failid)\n    /files/{fileId}\n      /files/{fileId}/versions              (sama faili versioonid)\n        /files/{fileId}/versions/{versionId}\n          /files/{fileId}/versions/{versionId}/content   (binaarne sisu)\n      /files/{fileId}/shares                (jagatud lingid)\n  /shares/{token}                           (avalik ligipääs lingi kaudu)\n"
+    "description": "RESTful API for file upload, version management, and shareable public links.\n\nResource hierarchy:\n  /files                                    (files)\n    /files/{fileId}\n      /files/{fileId}/versions              (versions of the file)\n        /files/{fileId}/versions/{versionId}\n          /files/{fileId}/versions/{versionId}/content   (binary payload)\n      /files/{fileId}/shares                (share links)\n  /shares/{token}                           (public access via link)"
   },
   "servers": [
     {
-      "url": "https://api.example.ee/v1",
-      "description": "Tootmisserver"
+      "url": "https://api.filenest.app/v1",
+      "description": "Production"
     },
     {
       "url": "http://localhost:3000/v1",
-      "description": "Arendus"
+      "description": "Development"
     }
   ],
   "tags": [
     {
       "name": "files",
-      "description": "Failide ressurss (üks loogiline fail sisaldab mitut versiooni)"
+      "description": "File resources (a logical file holds one or more versions)"
     },
     {
       "name": "versions",
-      "description": "Faili versioonid (muutumatud ajaloolised sisupiltid)"
+      "description": "Immutable historical snapshots of a file's content"
     },
     {
       "name": "shares",
-      "description": "Jagatavad lingid (autenditud loomine, avalik tarbimine)"
+      "description": "Share links (authenticated creation, public consumption)"
     }
   ],
   "security": [
@@ -37,82 +37,57 @@
   "paths": {
     "/files": {
       "get": {
-        "tags": [
-          "files"
-        ],
-        "summary": "Kuva kasutaja failide loend",
+        "tags": ["files"],
+        "summary": "List the current user's files",
         "operationId": "listFiles",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/Page"
-          },
-          {
-            "$ref": "#/components/parameters/PerPage"
-          },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
           {
             "in": "query",
             "name": "name",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Filtreeri nime järgi (osaline vaste)"
+            "schema": { "type": "string" },
+            "description": "Filter by name (partial match)"
           },
           {
             "in": "query",
             "name": "sort",
             "schema": {
               "type": "string",
-              "enum": [
-                "createdAt",
-                "-createdAt",
-                "updatedAt",
-                "-updatedAt",
-                "name",
-                "-name"
-              ],
+              "enum": ["createdAt", "-createdAt", "updatedAt", "-updatedAt", "name", "-name"],
               "default": "-updatedAt"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Failide loend",
+            "description": "List of files",
             "headers": {
               "X-Total-Count": {
-                "schema": {
-                  "type": "integer"
-                },
-                "description": "Kogu kirjete arv"
+                "schema": { "type": "integer" },
+                "description": "Total number of matching records"
               },
               "Link": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "RFC 5988 lehekülgede navigatsioon (next, prev, last)"
+                "schema": { "type": "string" },
+                "description": "RFC 5988 pagination navigation (next, prev, last)"
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/File"
-                  }
+                  "items": { "$ref": "#/components/schemas/File" }
                 }
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       },
       "post": {
-        "tags": [
-          "files"
-        ],
-        "summary": "Lae üles uus fail (loob esimese versiooni)",
-        "description": "Loob uue faili ressursi ja sellega koos esimese versiooni (v1).\nVastus sisaldab `Location` päist, mis osutab loodud failile.\n",
+        "tags": ["files"],
+        "summary": "Upload a new file (creates the first version)",
+        "description": "Creates a new file resource and its initial version (v1). The response includes a `Location` header pointing to the created file.",
         "operationId": "createFile",
         "requestBody": {
           "required": true,
@@ -120,22 +95,18 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "content"
-                ],
+                "required": ["content"],
                 "properties": {
                   "content": {
                     "type": "string",
                     "format": "binary",
-                    "description": "Faili binaarne sisu"
+                    "description": "File binary content"
                   },
                   "name": {
                     "type": "string",
-                    "description": "Kui puudub, võetakse originaalfailinimi"
+                    "description": "If omitted, the original filename is used"
                   },
-                  "description": {
-                    "type": "string"
-                  }
+                  "description": { "type": "string" }
                 }
               }
             }
@@ -143,93 +114,58 @@
         },
         "responses": {
           "201": {
-            "description": "Fail loodud",
+            "description": "File created",
             "headers": {
               "Location": {
-                "schema": {
-                  "type": "string",
-                  "format": "uri"
-                },
-                "description": "Loodud faili URL"
+                "schema": { "type": "string", "format": "uri" },
+                "description": "URL of the created file"
               },
-              "ETag": {
-                "schema": {
-                  "type": "string"
-                }
-              }
+              "ETag": { "schema": { "type": "string" } }
             },
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/File"
-                }
+                "schema": { "$ref": "#/components/schemas/File" }
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          }
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
         }
       }
     },
     "/files/{fileId}": {
       "parameters": [
-        {
-          "$ref": "#/components/parameters/FileId"
-        }
+        { "$ref": "#/components/parameters/FileId" }
       ],
       "get": {
-        "tags": [
-          "files"
-        ],
-        "summary": "Hangi faili metaandmed",
+        "tags": ["files"],
+        "summary": "Get file metadata",
         "operationId": "getFile",
         "responses": {
           "200": {
-            "description": "Faili metaandmed",
+            "description": "File metadata",
             "headers": {
-              "ETag": {
-                "schema": {
-                  "type": "string"
-                }
-              }
+              "ETag": { "schema": { "type": "string" } }
             },
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/File"
-                }
+                "schema": { "$ref": "#/components/schemas/File" }
               }
             }
           },
-          "304": {
-            "description": "Ei muudetud"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "304": { "description": "Not Modified" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       },
       "patch": {
-        "tags": [
-          "files"
-        ],
-        "summary": "Uuenda faili metaandmeid (osaline)",
-        "description": "Muudab ainult metaandmeid (nimi, kirjeldus). Sisu muutmiseks loo uus versioon.",
+        "tags": ["files"],
+        "summary": "Update file metadata (partial)",
+        "description": "Updates metadata only (name, description). To change content, create a new version.",
         "operationId": "updateFile",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          }
+          { "$ref": "#/components/parameters/IfMatch" }
         ],
         "requestBody": {
           "required": true,
@@ -238,15 +174,8 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  }
+                  "name": { "type": "string" },
+                  "description": { "type": ["string", "null"] }
                 }
               }
             }
@@ -254,96 +183,62 @@
         },
         "responses": {
           "200": {
-            "description": "Uuendatud",
+            "description": "Updated",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/File"
-                }
+                "schema": { "$ref": "#/components/schemas/File" }
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          }
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" }
         }
       },
       "delete": {
-        "tags": [
-          "files"
-        ],
-        "summary": "Kustuta fail ja kõik selle versioonid",
+        "tags": ["files"],
+        "summary": "Delete a file and all of its versions",
         "operationId": "deleteFile",
         "responses": {
-          "204": {
-            "description": "Kustutatud"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
     "/files/{fileId}/versions": {
       "parameters": [
-        {
-          "$ref": "#/components/parameters/FileId"
-        }
+        { "$ref": "#/components/parameters/FileId" }
       ],
       "get": {
-        "tags": [
-          "versions"
-        ],
-        "summary": "Kuva faili versioonide loend",
+        "tags": ["versions"],
+        "summary": "List versions of a file",
         "operationId": "listVersions",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/Page"
-          },
-          {
-            "$ref": "#/components/parameters/PerPage"
-          }
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" }
         ],
         "responses": {
           "200": {
-            "description": "Versioonide loend (uusim eespool)",
+            "description": "Version list (newest first)",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Version"
-                  }
+                  "items": { "$ref": "#/components/schemas/Version" }
                 }
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       },
       "post": {
-        "tags": [
-          "versions"
-        ],
-        "summary": "Lae üles uus versioon olemasolevale failile",
-        "description": "Loob uue muutumatu versiooni. Versiooninumber genereeritakse serveri poolt.",
+        "tags": ["versions"],
+        "summary": "Upload a new version of an existing file",
+        "description": "Creates a new immutable version. The version number is assigned by the server.",
         "operationId": "createVersion",
         "requestBody": {
           "required": true,
@@ -351,17 +246,12 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "content"
-                ],
+                "required": ["content"],
                 "properties": {
-                  "content": {
-                    "type": "string",
-                    "format": "binary"
-                  },
+                  "content": { "type": "string", "format": "binary" },
                   "note": {
                     "type": "string",
-                    "description": "Vabateksti kommentaar muudatuse kohta"
+                    "description": "Free-text note describing the change"
                   }
                 }
               }
@@ -370,96 +260,59 @@
         },
         "responses": {
           "201": {
-            "description": "Versioon loodud",
+            "description": "Version created",
             "headers": {
-              "Location": {
-                "schema": {
-                  "type": "string",
-                  "format": "uri"
-                }
-              }
+              "Location": { "schema": { "type": "string", "format": "uri" } }
             },
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Version"
-                }
+                "schema": { "$ref": "#/components/schemas/Version" }
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          }
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
         }
       }
     },
     "/files/{fileId}/versions/{versionId}": {
       "parameters": [
-        {
-          "$ref": "#/components/parameters/FileId"
-        },
-        {
-          "$ref": "#/components/parameters/VersionId"
-        }
+        { "$ref": "#/components/parameters/FileId" },
+        { "$ref": "#/components/parameters/VersionId" }
       ],
       "get": {
-        "tags": [
-          "versions"
-        ],
-        "summary": "Hangi versiooni metaandmed",
+        "tags": ["versions"],
+        "summary": "Get version metadata",
         "operationId": "getVersion",
         "responses": {
           "200": {
-            "description": "Versiooni metaandmed",
+            "description": "Version metadata",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Version"
-                }
+                "schema": { "$ref": "#/components/schemas/Version" }
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       },
       "delete": {
-        "tags": [
-          "versions"
-        ],
-        "summary": "Kustuta üksik versioon",
-        "description": "Ei saa kustutada, kui see on ainus versioon — kustuta fail tervikuna.",
+        "tags": ["versions"],
+        "summary": "Delete a single version",
+        "description": "Cannot delete the only remaining version — delete the file instead.",
         "operationId": "deleteVersion",
         "responses": {
-          "204": {
-            "description": "Kustutatud"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
+          "204": { "description": "Deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
           "409": {
-            "description": "Konflikt — see on ainus versioon",
+            "description": "Conflict — this is the only remaining version",
             "content": {
               "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
+                "schema": { "$ref": "#/components/schemas/Problem" }
               }
             }
           }
@@ -468,98 +321,65 @@
     },
     "/files/{fileId}/versions/{versionId}/content": {
       "parameters": [
-        {
-          "$ref": "#/components/parameters/FileId"
-        },
-        {
-          "$ref": "#/components/parameters/VersionId"
-        }
+        { "$ref": "#/components/parameters/FileId" },
+        { "$ref": "#/components/parameters/VersionId" }
       ],
       "get": {
-        "tags": [
-          "versions"
-        ],
-        "summary": "Lae alla versiooni binaarne sisu",
+        "tags": ["versions"],
+        "summary": "Download the binary content of a version",
         "operationId": "downloadVersionContent",
         "responses": {
           "200": {
-            "description": "Faili sisu voog",
+            "description": "File content stream",
             "headers": {
               "Content-Type": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "Algne MIME tüüp"
+                "schema": { "type": "string" },
+                "description": "Original MIME type"
               },
               "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                },
+                "schema": { "type": "string" },
                 "description": "attachment; filename=\"...\""
               },
-              "ETag": {
-                "schema": {
-                  "type": "string"
-                }
-              }
+              "ETag": { "schema": { "type": "string" } }
             },
             "content": {
               "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
+                "schema": { "type": "string", "format": "binary" }
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
     "/files/{fileId}/shares": {
       "parameters": [
-        {
-          "$ref": "#/components/parameters/FileId"
-        }
+        { "$ref": "#/components/parameters/FileId" }
       ],
       "get": {
-        "tags": [
-          "shares"
-        ],
-        "summary": "Kuva selle faili aktiivsed jagatud lingid",
+        "tags": ["shares"],
+        "summary": "List active share links for this file",
         "operationId": "listShares",
         "responses": {
           "200": {
-            "description": "Jagatud linkide loend",
+            "description": "List of share links",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Share"
-                  }
+                  "items": { "$ref": "#/components/schemas/Share" }
                 }
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       },
       "post": {
-        "tags": [
-          "shares"
-        ],
-        "summary": "Loo uus jagatud link",
+        "tags": ["shares"],
+        "summary": "Create a new share link",
         "operationId": "createShare",
         "requestBody": {
           "required": true,
@@ -570,21 +390,21 @@
                 "properties": {
                   "versionId": {
                     "type": "string",
-                    "description": "Kui on antud, jagatakse konkreetset versiooni; muidu alati uusimat"
+                    "description": "If provided, share a specific version; otherwise always the latest"
                   },
                   "expiresAt": {
                     "type": "string",
                     "format": "date-time",
-                    "description": "Lingi kehtivuse lõpp (kui puudub, kehtib määramata aja)"
+                    "description": "Link expiry time (if omitted, the link does not expire)"
                   },
                   "password": {
                     "type": "string",
-                    "description": "Vabatahtlik parool ligipääsu piiramiseks"
+                    "description": "Optional password to restrict access"
                   },
                   "maxDownloads": {
                     "type": "integer",
                     "minimum": 1,
-                    "description": "Allalaadimiste limiit"
+                    "description": "Maximum number of downloads allowed"
                   }
                 }
               }
@@ -593,91 +413,57 @@
         },
         "responses": {
           "201": {
-            "description": "Link loodud",
+            "description": "Link created",
             "headers": {
-              "Location": {
-                "schema": {
-                  "type": "string",
-                  "format": "uri"
-                }
-              }
+              "Location": { "schema": { "type": "string", "format": "uri" } }
             },
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Share"
-                }
+                "schema": { "$ref": "#/components/schemas/Share" }
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
     "/files/{fileId}/shares/{shareId}": {
       "parameters": [
-        {
-          "$ref": "#/components/parameters/FileId"
-        },
+        { "$ref": "#/components/parameters/FileId" },
         {
           "in": "path",
           "name": "shareId",
           "required": true,
-          "schema": {
-            "type": "string",
-            "format": "uuid"
-          }
+          "schema": { "type": "string", "format": "uuid" }
         }
       ],
       "get": {
-        "tags": [
-          "shares"
-        ],
-        "summary": "Hangi jagatud lingi detailid (omaniku vaade)",
+        "tags": ["shares"],
+        "summary": "Get share link details (owner view)",
         "operationId": "getShare",
         "responses": {
           "200": {
-            "description": "Lingi detailid",
+            "description": "Share link details",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Share"
-                }
+                "schema": { "$ref": "#/components/schemas/Share" }
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       },
       "delete": {
-        "tags": [
-          "shares"
-        ],
-        "summary": "Tühista jagatud link",
+        "tags": ["shares"],
+        "summary": "Revoke a share link",
         "operationId": "revokeShare",
         "responses": {
-          "204": {
-            "description": "Tühistatud"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
+          "204": { "description": "Revoked" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -687,18 +473,14 @@
           "in": "path",
           "name": "token",
           "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "description": "Avalik jagamise token (kuulub lingi URL-i)"
+          "schema": { "type": "string" },
+          "description": "Public share token (part of the link URL)"
         }
       ],
       "get": {
-        "tags": [
-          "shares"
-        ],
-        "summary": "Avalik — hangi jagatud faili metaandmed",
-        "description": "Avalik endpoint, ei vaja autentimist. Kui link on parooliga kaitstud, anna parool `X-Share-Password` päises.",
+        "tags": ["shares"],
+        "summary": "Public — get metadata for a shared file",
+        "description": "Public endpoint, does not require authentication. If the link is password-protected, send the password in the `X-Share-Password` header.",
         "operationId": "getPublicShare",
         "security": [],
         "parameters": [
@@ -706,31 +488,21 @@
             "in": "header",
             "name": "X-Share-Password",
             "required": false,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
-            "description": "Avalik info jagatud faili kohta",
+            "description": "Public metadata of the shared file",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublicShare"
-                }
+                "schema": { "$ref": "#/components/schemas/PublicShare" }
               }
             }
           },
-          "401": {
-            "description": "Parool on vajalik või vale"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "410": {
-            "description": "Link on aegunud või tühistatud"
-          }
+          "401": { "description": "Password required or incorrect" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "410": { "description": "Link has expired or been revoked" }
         }
       }
     },
@@ -740,16 +512,12 @@
           "in": "path",
           "name": "token",
           "required": true,
-          "schema": {
-            "type": "string"
-          }
+          "schema": { "type": "string" }
         }
       ],
       "get": {
-        "tags": [
-          "shares"
-        ],
-        "summary": "Avalik — lae alla jagatud faili sisu",
+        "tags": ["shares"],
+        "summary": "Public — download the content of a shared file",
         "operationId": "downloadPublicShare",
         "security": [],
         "parameters": [
@@ -757,44 +525,25 @@
             "in": "header",
             "name": "X-Share-Password",
             "required": false,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
-            "description": "Faili sisu",
+            "description": "File content",
             "headers": {
-              "Content-Type": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                }
-              }
+              "Content-Type": { "schema": { "type": "string" } },
+              "Content-Disposition": { "schema": { "type": "string" } }
             },
             "content": {
               "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
+                "schema": { "type": "string", "format": "binary" }
               }
             }
           },
-          "401": {
-            "description": "Parool on vajalik või vale"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "410": {
-            "description": "Link on aegunud, tühistatud või limit täis"
-          }
+          "401": { "description": "Password required or incorrect" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "410": { "description": "Link has expired, been revoked, or reached its download limit" }
         }
       }
     }
@@ -812,97 +561,70 @@
         "in": "path",
         "name": "fileId",
         "required": true,
-        "schema": {
-          "type": "string",
-          "format": "uuid"
-        }
+        "schema": { "type": "string", "format": "uuid" }
       },
       "VersionId": {
         "in": "path",
         "name": "versionId",
         "required": true,
-        "schema": {
-          "type": "string",
-          "format": "uuid"
-        }
+        "schema": { "type": "string", "format": "uuid" }
       },
       "Page": {
         "in": "query",
         "name": "page",
-        "schema": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 1
-        }
+        "schema": { "type": "integer", "minimum": 1, "default": 1 }
       },
       "PerPage": {
         "in": "query",
         "name": "perPage",
-        "schema": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100,
-          "default": 20
-        }
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
       },
       "IfMatch": {
         "in": "header",
         "name": "If-Match",
         "required": false,
-        "schema": {
-          "type": "string"
-        },
-        "description": "Optimistliku lukustuse ETag (väldib race condition'eid)"
+        "schema": { "type": "string" },
+        "description": "ETag for optimistic concurrency (prevents race conditions)"
       }
     },
     "responses": {
       "BadRequest": {
-        "description": "Vigane päring",
+        "description": "Bad request",
         "content": {
           "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/Problem"
-            }
+            "schema": { "$ref": "#/components/schemas/Problem" }
           }
         }
       },
       "Unauthorized": {
-        "description": "Autentimata või token aegunud",
+        "description": "Missing or invalid authentication",
         "content": {
           "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/Problem"
-            }
+            "schema": { "$ref": "#/components/schemas/Problem" }
           }
         }
       },
       "NotFound": {
-        "description": "Ressurssi ei leitud",
+        "description": "Resource not found",
         "content": {
           "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/Problem"
-            }
+            "schema": { "$ref": "#/components/schemas/Problem" }
           }
         }
       },
       "PreconditionFailed": {
-        "description": "If-Match ei vasta praegusele ETag-ile",
+        "description": "If-Match does not match the current ETag",
         "content": {
           "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/Problem"
-            }
+            "schema": { "$ref": "#/components/schemas/Problem" }
           }
         }
       },
       "PayloadTooLarge": {
-        "description": "Fail on liiga suur",
+        "description": "File is too large",
         "content": {
           "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/Problem"
-            }
+            "schema": { "$ref": "#/components/schemas/Problem" }
           }
         }
       }
@@ -910,242 +632,95 @@
     "schemas": {
       "File": {
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "currentVersionId",
-          "createdAt",
-          "updatedAt"
-        ],
+        "required": ["id", "name", "currentVersionId", "createdAt", "updatedAt"],
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "sizeBytes": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "currentVersionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "versionCount": {
-            "type": "integer"
-          },
-          "ownerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "mimeType": { "type": "string" },
+          "sizeBytes": { "type": "integer", "format": "int64" },
+          "currentVersionId": { "type": "string", "format": "uuid" },
+          "versionCount": { "type": "integer" },
+          "ownerId": { "type": "string", "format": "uuid" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
           "_links": {
             "type": "object",
-            "description": "HATEOAS navigatsioon",
+            "description": "HATEOAS navigation",
             "properties": {
-              "self": {
-                "type": "string",
-                "format": "uri"
-              },
-              "versions": {
-                "type": "string",
-                "format": "uri"
-              },
-              "shares": {
-                "type": "string",
-                "format": "uri"
-              },
-              "currentContent": {
-                "type": "string",
-                "format": "uri"
-              }
+              "self": { "type": "string", "format": "uri" },
+              "versions": { "type": "string", "format": "uri" },
+              "shares": { "type": "string", "format": "uri" },
+              "currentContent": { "type": "string", "format": "uri" }
             }
           }
         }
       },
       "Version": {
         "type": "object",
-        "required": [
-          "id",
-          "fileId",
-          "versionNumber",
-          "sizeBytes",
-          "createdAt"
-        ],
+        "required": ["id", "fileId", "versionNumber", "sizeBytes", "createdAt"],
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "fileId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "versionNumber": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "sizeBytes": {
-            "type": "integer",
-            "format": "int64"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "fileId": { "type": "string", "format": "uuid" },
+          "versionNumber": { "type": "integer", "minimum": 1 },
+          "note": { "type": ["string", "null"] },
+          "mimeType": { "type": "string" },
+          "sizeBytes": { "type": "integer", "format": "int64" },
           "checksum": {
             "type": "string",
-            "description": "SHA-256 hex"
+            "description": "SHA-256 hex digest"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "createdBy": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "createdBy": { "type": "string", "format": "uuid" },
           "_links": {
             "type": "object",
             "properties": {
-              "self": {
-                "type": "string",
-                "format": "uri"
-              },
-              "file": {
-                "type": "string",
-                "format": "uri"
-              },
-              "content": {
-                "type": "string",
-                "format": "uri"
-              }
+              "self": { "type": "string", "format": "uri" },
+              "file": { "type": "string", "format": "uri" },
+              "content": { "type": "string", "format": "uri" }
             }
           }
         }
       },
       "Share": {
         "type": "object",
-        "required": [
-          "id",
-          "fileId",
-          "token",
-          "url",
-          "createdAt"
-        ],
+        "required": ["id", "fileId", "token", "url", "createdAt"],
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "fileId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "fileId": { "type": "string", "format": "uuid" },
           "versionId": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "uuid",
-            "description": "null = jagab alati uusimat versiooni"
+            "description": "null = always shares the latest version"
           },
-          "token": {
-            "type": "string"
-          },
+          "token": { "type": "string" },
           "url": {
             "type": "string",
             "format": "uri",
-            "description": "Täielik avalik link"
+            "description": "Full public link URL"
           },
-          "hasPassword": {
-            "type": "boolean"
-          },
-          "expiresAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
-          "maxDownloads": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "downloadCount": {
-            "type": "integer"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "revokedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          }
+          "hasPassword": { "type": "boolean" },
+          "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+          "maxDownloads": { "type": ["integer", "null"] },
+          "downloadCount": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "revokedAt": { "type": ["string", "null"], "format": "date-time" }
         }
       },
       "PublicShare": {
         "type": "object",
-        "description": "Piiratud vaade anonüümsetele kasutajatele (ei sisalda omaniku andmeid)",
-        "required": [
-          "fileName",
-          "sizeBytes",
-          "mimeType"
-        ],
+        "description": "Restricted view for anonymous consumers (does not expose owner data)",
+        "required": ["fileName", "sizeBytes", "mimeType"],
         "properties": {
-          "fileName": {
-            "type": "string"
-          },
-          "sizeBytes": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "versionNumber": {
-            "type": "integer"
-          },
-          "expiresAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
+          "fileName": { "type": "string" },
+          "sizeBytes": { "type": "integer", "format": "int64" },
+          "mimeType": { "type": "string" },
+          "versionNumber": { "type": "integer" },
+          "expiresAt": { "type": ["string", "null"], "format": "date-time" },
           "_links": {
             "type": "object",
             "properties": {
-              "content": {
-                "type": "string",
-                "format": "uri"
-              }
+              "content": { "type": "string", "format": "uri" }
             }
           }
         }
@@ -1154,24 +729,11 @@
         "type": "object",
         "description": "RFC 7807 Problem Details",
         "properties": {
-          "type": {
-            "type": "string",
-            "format": "uri",
-            "default": "about:blank"
-          },
-          "title": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer"
-          },
-          "detail": {
-            "type": "string"
-          },
-          "instance": {
-            "type": "string",
-            "format": "uri"
-          }
+          "type": { "type": "string", "format": "uri", "default": "about:blank" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string", "format": "uri" }
         }
       }
     }
