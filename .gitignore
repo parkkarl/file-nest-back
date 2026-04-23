@@ -4,3 +4,11 @@ dist/
 *.log
 .env
 .env.*
+!.env.example
+
+# Runtime data — SQLite DB and uploaded file blobs
+data/
+storage/
+
+# Bun
+bun.lockb

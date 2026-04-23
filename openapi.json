@@ -17,6 +17,10 @@
   ],
   "tags": [
     {
+      "name": "auth",
+      "description": "User registration and session management (login / logout)"
+    },
+    {
       "name": "files",
       "description": "File resources (a logical file holds one or more versions)"
     },
@@ -35,6 +39,148 @@
     }
   ],
   "paths": {
+    "/auth/users": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register a new user and start a session",
+        "operationId": "registerUser",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Credentials" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created and first session issued",
+            "headers": {
+              "Location": {
+                "schema": { "type": "string", "format": "uri" },
+                "description": "URL of the new user resource"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": {
+            "description": "Email already registered",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/Problem" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/sessions": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Create a new session (log in)",
+        "description": "Exchanges credentials for a bearer token. The response includes a `Location` header pointing to the new session resource.",
+        "operationId": "createSession",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Credentials" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created",
+            "headers": {
+              "Location": {
+                "schema": { "type": "string", "format": "uri" },
+                "description": "URL of the new session"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "get": {
+        "tags": ["auth"],
+        "summary": "List the current user's active sessions",
+        "operationId": "listSessions",
+        "responses": {
+          "200": {
+            "description": "Active sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Session" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/sessions/current": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Inspect the caller's current session",
+        "operationId": "getCurrentSession",
+        "responses": {
+          "200": {
+            "description": "Current session",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Session" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "tags": ["auth"],
+        "summary": "Revoke the caller's current session (log out)",
+        "operationId": "deleteCurrentSession",
+        "responses": {
+          "204": { "description": "Session revoked" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/sessions/{sessionId}": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "sessionId",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" }
+        }
+      ],
+      "delete": {
+        "tags": ["auth"],
+        "summary": "Revoke a specific session (e.g. sign out another device)",
+        "operationId": "deleteSession",
+        "responses": {
+          "204": { "description": "Session revoked" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/files": {
       "get": {
         "tags": ["files"],
@@ -734,6 +880,52 @@
           "status": { "type": "integer" },
           "detail": { "type": "string" },
           "instance": { "type": "string", "format": "uri" }
+        }
+      },
+      "Credentials": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8 }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "required": ["token", "expiresAt", "user"],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Bearer JWT — send as `Authorization: Bearer <token>`"
+          },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" }
+            }
+          },
+          "user": {
+            "type": "object",
+            "required": ["id", "email"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "email": { "type": "string", "format": "email" }
+            }
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "required": ["id", "createdAt", "lastUsedAt", "expiresAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "userAgent": { "type": ["string", "null"] },
+          "ipAddress": { "type": ["string", "null"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "lastUsedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "revokedAt": { "type": ["string", "null"], "format": "date-time" }
         }
       }
     }

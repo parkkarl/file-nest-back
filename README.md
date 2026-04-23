@@ -13,13 +13,26 @@ Alternative viewers:
 ## Contents
 
 - [`openapi.json`](./openapi.json) — full API specification
+- [`src/`](./src) — Bun + Hono implementation (SQLite + drizzle-orm)
+
+## Running locally
+
+```bash
+bun install
+cp .env.example .env          # optional — defaults are fine for local dev
+bun run db:migrate            # creates ./data/file-nest.db
+bun run dev                   # starts on http://localhost:3000 (hot reload)
+```
+
+Endpoints are under `/v1`. Use the [Swagger Editor link](https://editor.swagger.io/?url=https://raw.githubusercontent.com/parkkarl/file-nest-back/main/openapi.json) to explore and try requests.
 
 ## Core features
 
-- **Upload** — `POST /files` creates a new file and its first version; `POST /files/{id}/versions` appends a new version
-- **Version management** — each version is immutable, numbered, and separately addressable (`/files/{id}/versions/{vid}`)
-- **Share links** — `POST /files/{id}/shares` creates a public link (optional password, expiry, download limit)
-- **Public consumption** — `GET /shares/{token}` and `GET /shares/{token}/content` (no authentication required)
+- **Auth** — `POST /v1/auth/users` (register), `POST /v1/auth/sessions` (login), `DELETE /v1/auth/sessions/current` (logout); sessions tracked server-side so revocation is real
+- **Upload** — `POST /v1/files` creates a new file and its first version; `POST /v1/files/{id}/versions` appends a new version
+- **Version management** — each version is immutable, numbered, and separately addressable (`/v1/files/{id}/versions/{vid}`)
+- **Share links** — `POST /v1/files/{id}/shares` creates a public link (optional password, expiry, download limit)
+- **Public consumption** — `GET /v1/shares/{token}` and `GET /v1/shares/{token}/content` (no authentication required)
 
 ## RESTful design decisions
 
