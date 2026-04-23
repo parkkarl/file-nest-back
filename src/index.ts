@@ -10,8 +10,16 @@ import publicSharesRoutes from './routes/public-shares.ts';
 
 const app = new Hono();
 
-app.use('*', logger());
-app.use('*', cors());
+if (!config.isProd) app.use('*', logger());
+app.use(
+  '*',
+  cors({
+    origin: config.allowedOrigins === '*' ? '*' : (origin) =>
+      (config.allowedOrigins as string[]).includes(origin) ? origin : null,
+    allowHeaders: ['Authorization', 'Content-Type', 'If-Match', 'If-None-Match', 'X-Share-Password'],
+    exposeHeaders: ['ETag', 'Location', 'Link', 'X-Total-Count'],
+  }),
+);
 
 app.get('/', (c) =>
   c.json({

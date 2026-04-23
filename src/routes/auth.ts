@@ -8,6 +8,10 @@ import { badRequest, conflict, notFound, unauthorized } from '../lib/errors.ts';
 
 const app = new Hono<{ Variables: AuthVars }>();
 
+// Precomputed hash of a random string: used to equalize timing when the user
+// row is missing, so login latency can't distinguish "email known" from "email unknown".
+const DUMMY_PASSWORD_HASH = await Bun.password.hash(randomUUID());
+
 function sessionMeta(c: { req: { header: (k: string) => string | undefined } }) {
   return {
     userAgent: c.req.header('User-Agent'),
@@ -52,10 +56,10 @@ app.post('/sessions', async (c) => {
   if (!body?.email || !body?.password) return badRequest(c, 'email and password required');
 
   const user = await db.select().from(users).where(eq(users.email, body.email)).get();
-  if (!user) return unauthorized(c, 'invalid credentials');
-
-  const ok = await Bun.password.verify(body.password, user.passwordHash);
-  if (!ok) return unauthorized(c, 'invalid credentials');
+  // Always run verify (against a dummy hash when the user doesn't exist) so login
+  // latency doesn't leak whether the email is registered.
+  const ok = await Bun.password.verify(body.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+  if (!user || !ok) return unauthorized(c, 'invalid credentials');
 
   const { token, sessionId, expiresAt } = await createSession(user.id, user.email, sessionMeta(c));
   c.header('Location', `/v1/auth/sessions/${sessionId}`);
