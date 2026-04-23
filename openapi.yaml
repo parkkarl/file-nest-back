@@ -144,7 +144,8 @@ paths:
               type: object
               properties:
                 name: { type: string }
-                description: { type: string, nullable: true }
+                description:
+                  type: [string, 'null']
       responses:
         '200':
           description: Uuendatud
@@ -424,7 +425,8 @@ paths:
               schema: { type: string, format: binary }
         '401': { description: Parool on vajalik või vale }
         '404': { $ref: '#/components/responses/NotFound' }
-        '410': { description: Link on aegunud, tühistatud või limit täis }
+        '410':
+          description: Link on aegunud, tühistatud või limit täis
 
 components:
   securitySchemes:
@@ -493,7 +495,8 @@ components:
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        description: { type: string, nullable: true }
+        description:
+          type: [string, 'null']
         mimeType: { type: string }
         sizeBytes: { type: integer, format: int64 }
         currentVersionId: { type: string, format: uuid }
@@ -517,7 +520,8 @@ components:
         id: { type: string, format: uuid }
         fileId: { type: string, format: uuid }
         versionNumber: { type: integer, minimum: 1 }
-        note: { type: string, nullable: true }
+        note:
+          type: [string, 'null']
         mimeType: { type: string }
         sizeBytes: { type: integer, format: int64 }
         checksum:
@@ -541,7 +545,6 @@ components:
         versionId:
           type: string
           format: uuid
-          nullable: true
           description: null = jagab alati uusimat versiooni
         token: { type: string }
         url:
@@ -549,11 +552,16 @@ components:
           format: uri
           description: Täielik avalik link
         hasPassword: { type: boolean }
-        expiresAt: { type: string, format: date-time, nullable: true }
-        maxDownloads: { type: integer, nullable: true }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+        maxDownloads:
+          type: [integer, 'null']
         downloadCount: { type: integer }
         createdAt: { type: string, format: date-time }
-        revokedAt: { type: string, format: date-time, nullable: true }
+        revokedAt:
+          type: [string, 'null']
+          format: date-time
 
     PublicShare:
       type: object
@@ -564,7 +572,9 @@ components:
         sizeBytes: { type: integer, format: int64 }
         mimeType: { type: string }
         versionNumber: { type: integer }
-        expiresAt: { type: string, format: date-time, nullable: true }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
         _links:
           type: object
           properties:
