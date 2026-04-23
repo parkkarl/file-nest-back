@@ -105,6 +105,14 @@ app.get('/:fileId/versions/:versionId', async (c) => {
     .where(and(eq(versions.id, c.req.param('versionId')), eq(versions.fileId, f.id)))
     .get();
   if (!v) return notFound(c);
+  // Versions are immutable — use the checksum as a strong ETag and
+  // allow aggressive client caching.
+  const etag = `"${v.checksum}"`;
+  if (c.req.header('If-None-Match') === etag) {
+    return new Response(null, { status: 304, headers: { ETag: etag } });
+  }
+  c.header('ETag', etag);
+  c.header('Cache-Control', 'public, immutable, max-age=31536000');
   return c.json(toVersionDto(v));
 });
 
@@ -146,13 +154,19 @@ app.get('/:fileId/versions/:versionId/content', async (c) => {
     .get();
   if (!v) return notFound(c);
 
+  const etag = `"${v.checksum}"`;
+  if (c.req.header('If-None-Match') === etag) {
+    return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': 'public, immutable, max-age=31536000' } });
+  }
+
   return new Response(readBlob(v.storagePath), {
     headers: {
       'Content-Type': v.mimeType,
       'Content-Length': String(v.sizeBytes),
       'Content-Disposition': contentDispositionAttachment(f.name),
       'X-Content-Type-Options': 'nosniff',
-      'ETag': `"${v.checksum}"`,
+      'Cache-Control': 'public, immutable, max-age=31536000',
+      'ETag': etag,
     },
   });
 });

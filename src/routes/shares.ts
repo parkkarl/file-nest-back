@@ -51,8 +51,10 @@ app.post('/:fileId/shares', async (c) => {
     versionId = v.id;
   }
 
-  if (body.expiresAt && isNaN(Date.parse(body.expiresAt))) {
-    return badRequest(c, 'expiresAt must be a valid ISO-8601 timestamp');
+  if (body.expiresAt) {
+    const t = Date.parse(body.expiresAt);
+    if (Number.isNaN(t)) return badRequest(c, 'expiresAt must be a valid ISO-8601 timestamp');
+    if (t <= Date.now()) return badRequest(c, 'expiresAt must be in the future');
   }
   if (body.maxDownloads != null && (!Number.isInteger(body.maxDownloads) || body.maxDownloads < 1)) {
     return badRequest(c, 'maxDownloads must be a positive integer');

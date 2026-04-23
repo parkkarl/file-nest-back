@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, desc, eq, like, count } from 'drizzle-orm';
+import { and, desc, eq, count, sql } from 'drizzle-orm';
 import { randomUUID, createHash } from 'node:crypto';
 import { db } from '../db/client.ts';
 import { files, versions } from '../db/schema.ts';
@@ -42,8 +42,10 @@ app.get('/', async (c) => {
   const nameFilter = c.req.query('name');
   const sort = c.req.query('sort') ?? '-updatedAt';
 
-  const where = nameFilter
-    ? and(eq(files.ownerId, ownerId), like(files.name, `%${nameFilter}%`))
+  // Escape SQL LIKE wildcards (%, _, \) in the user's query before wrapping.
+  const escaped = nameFilter?.replace(/[\\%_]/g, (m) => `\\${m}`);
+  const where = escaped
+    ? and(eq(files.ownerId, ownerId), sql`${files.name} LIKE ${'%' + escaped + '%'} ESCAPE '\\'`)
     : eq(files.ownerId, ownerId);
 
   const orderBy = (() => {
